@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>लग्न पाहुणे यादी (Wedding Guest List)</title>
+    <!-- Tailwind CSS for Styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for Marathi Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for Visual Statistics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS (xlsx.full.min.js) for Excel Export - Reliable CDN -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: 'Noto Sans Devanagari', sans-serif;
+            background-color: #f8fafc;
+        }
+        .mic-active {
+            animation: pulse 1.5s infinite;
+            background-color: #ef4444 !important;
+            color: white !important;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+    </style>
+</head>
+<body class="bg-rose-50/50 min-h-screen pb-12">
+
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="bg-white/20 p-2 rounded-full">
+                    <i class="fa-solid font-bold text-2xl fa-heart-pulse"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl md:text-2xl font-bold tracking-wide">लग्न पाहुणे यादी नोंदणी</h1>
+                    <p class="text-xs text-rose-100">आवाजाद्वारे नावे, गावे, नाते व मोबाईल नंबर नोंदवा</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button onclick="openSettingsModal()" class="bg-white/20 hover:bg-white/30 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow flex items-center space-x-1.5 transition">
+                    <i class="fa-solid fa-cloud-arrow-up text-sm"></i>
+                    <span class="hidden sm:inline">Drive Sync</span>
+                </button>
+                <button onclick="exportToExcel()" class="bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold px-3 py-2 rounded-lg shadow flex items-center space-x-2 transition active:scale-95">
+                    <i class="fa-solid fa-file-excel text-lg"></i>
+                    <span class="hidden sm:inline">एक्सेल डाऊनलोड</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Sync Status Banner -->
+    <div id="syncStatus" class="hidden bg-indigo-600 text-white text-xs py-1.5 px-4 text-center font-medium flex items-center justify-center space-x-2">
+        <i class="fa-solid fa-arrows-rotate fa-spin"></i>
+        <span id="syncText">Google Drive (Sheet) वर अपडेट होत आहे...</span>
+    </div>
+
+    <!-- Alert / Toast Message Banner -->
+    <div id="toast" class="hidden fixed top-20 right-4 z-50 bg-gray-800 text-white px-4 py-3 rounded-xl shadow-xl flex items-center space-x-2 text-sm transition-all duration-300">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+        <span id="toastMsg">मेसेज टेक्स्ट</span>
+    </div>
+
+    <!-- Google Apps Script Config Modal -->
+    <div id="settingsModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="text-base font-bold text-gray-800 flex items-center gap-2">
+                    <i class="fa-brands fa-google-drive text-emerald-600 text-lg"></i> Google Drive Sheet Sync सेटींग्स
+                </h3>
+                <button onclick="closeSettingsModal()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <p class="text-xs text-gray-600 leading-relaxed">
+                तुमच्या Google Drive मधील Sheet शी जोडण्यासाठी Google Apps Script ची Web App URL पेस्ट करा:
+            </p>
+            <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">Google Apps Script Web App URL:</label>
+                <input type="url" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec" 
+                    class="w-full p-2.5 border border-gray-300 rounded-xl text-xs focus:ring-2 focus:ring-rose-500 outline-none">
+            </div>
+            <div class="flex justify-end space-x-2 pt-2">
+                <button onclick="closeSettingsModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-xl">रद्द करा</button>
+                <button onclick="saveSettings()" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-xl">लिंक सेव्ह करा</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Modal Popup for Reset Confirmation -->
+    <div id="resetModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl space-y-4">
+            <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="text-lg font-bold text-gray-800">सर्व डेटा हटवायचा आहे का?</h3>
+            <p class="text-xs text-gray-500">हा डेटा पूर्णपणे हटवला जाईल आणि तो परत मिळवता येणार नाही.</p>
+            <div class="flex justify-center space-x-3 pt-2">
+                <button onclick="closeResetModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-xl">रद्द करा</button>
+                <button onclick="confirmResetAll()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-xl">होय, हटवा</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <main class="max-w-5xl mx-auto px-4 mt-6 space-y-6">
+
+        <!-- Input Section Card -->
+        <section class="bg-white rounded-2xl shadow-md p-5 border border-rose-100">
+            <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-user-plus text-rose-600"></i> नवीन पाहुणा जोडा
+            </h2>
+
+            <form id="guestForm" onsubmit="addGuest(event)" class="space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                    
+                    <!-- Person Name Input -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">व्यक्तिचे नाव:</label>
+                        <div class="relative flex items-center">
+                            <input type="text" id="personName" required placeholder="उदा. सुरेश पाटील" 
+                                class="w-full pl-3 pr-10 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition">
+                            <button type="button" onclick="startSpeech('personName', 'nameMicBtn')" id="nameMicBtn" title="बोलून टाईप करा"
+                                class="absolute right-1 p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition">
+                                <i class="fa-solid fa-microphone text-base"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Village/City Input -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">गावाचे नाव:</label>
+                        <div class="relative flex items-center">
+                            <input type="text" id="villageName" required placeholder="उदा. पुणे / सांगली" 
+                                class="w-full pl-3 pr-10 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition">
+                            <button type="button" onclick="startSpeech('villageName', 'villageMicBtn')" id="villageMicBtn" title="बोलून टाईप करा"
+                                class="absolute right-1 p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition">
+                                <i class="fa-solid fa-microphone text-base"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Relationship Input -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">नातेसंबंध (Relationship):</label>
+                        <div class="relative flex items-center">
+                            <input type="text" id="relationship" placeholder="उदा. मामा / मित्र / शेजारी" 
+                                class="w-full pl-3 pr-10 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition">
+                            <button type="button" onclick="startSpeech('relationship', 'relMicBtn')" id="relMicBtn" title="बोलून टाईप करा"
+                                class="absolute right-1 p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition">
+                                <i class="fa-solid fa-microphone text-base"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Contact Number Input -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">संपर्क क्रमांक (Contact):</label>
+                        <div class="relative flex items-center">
+                            <input type="tel" id="contactNum" placeholder="उदा. 9876543210" 
+                                class="w-full pl-3 pr-10 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition">
+                            <button type="button" onclick="startSpeech('contactNum', 'phoneMicBtn')" id="phoneMicBtn" title="बोलून टाईप करा"
+                                class="absolute right-1 p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition">
+                                <i class="fa-solid fa-microphone text-base"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Combined Voice Assistant Button & Submit -->
+                <div class="flex flex-col sm:flex-row gap-3 pt-2">
+                    <button type="button" onclick="startCombinedSpeech()" id="combinedMicBtn" 
+                        class="w-full sm:w-1/2 bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 px-4 rounded-xl shadow flex items-center justify-center gap-2 transition active:scale-95 text-sm">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        <span>स्मार्ट एकत्र बोला (उदा. "रमेश पाटील पुणे मामा ९८७६५४३२१०")</span>
+                    </button>
+
+                    <button type="submit" 
+                        class="w-full sm:w-1/2 bg-rose-600 hover:bg-rose-700 text-white font-semibold py-3 px-4 rounded-xl shadow flex items-center justify-center gap-2 transition active:scale-95 text-sm">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>यादीत जोडा</span>
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Stats Overview Cards -->
+        <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="bg-gradient-to-br from-rose-500 to-pink-600 text-white p-4 rounded-2xl shadow-md flex justify-between items-center">
+                <div>
+                    <p class="text-xs font-medium opacity-90">एकूण नोंदवलेले पाहुणे</p>
+                    <h3 class="text-3xl font-extrabold mt-1" id="totalGuestsCount">0</h3>
+                </div>
+                <div class="bg-white/20 p-3 rounded-xl">
+                    <i class="fa-solid fa-users text-2xl"></i>
+                </div>
+            </div>
+
+            <div class="bg-gradient-to-br from-amber-500 to-orange-600 text-white p-4 rounded-2xl shadow-md flex justify-between items-center">
+                <div>
+                    <p class="text-xs font-medium opacity-90">एकूण गावे/शहर संख्या</p>
+                    <h3 class="text-3xl font-extrabold mt-1" id="totalVillagesCount">0</h3>
+                </div>
+                <div class="bg-white/20 p-3 rounded-xl">
+                    <i class="fa-solid fa-location-dot text-2xl"></i>
+                </div>
+            </div>
+
+            <div class="bg-gradient-to-br from-indigo-500 to-purple-600 text-white p-4 rounded-2xl shadow-md flex justify-between items-center">
+                <div>
+                    <p class="text-xs font-medium opacity-90">नातेसंबंध प्रकार</p>
+                    <h3 class="text-3xl font-extrabold mt-1" id="totalRelationsCount">0</h3>
+                </div>
+                <div class="bg-white/20 p-3 rounded-xl">
+                    <i class="fa-solid fa-people-roof text-2xl"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- Analytics & Chart Section -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Village-wise Table -->
+            <div class="bg-white rounded-2xl shadow-md p-4 border border-rose-100 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-sm font-bold text-gray-800 mb-3 flex items-center">
+                        <i class="fa-solid fa-list-ol text-amber-500 mr-2"></i>गाववार संख्या समरी
+                    </h3>
+                    <div class="overflow-x-auto max-h-52 overflow-y-auto rounded-lg border border-gray-100">
+                        <table class="w-full text-xs text-left text-gray-600">
+                            <thead class="text-xs text-gray-700 uppercase bg-rose-50 sticky top-0">
+                                <tr>
+                                    <th class="px-3 py-2">गावाचे नाव</th>
+                                    <th class="px-3 py-2 text-right">संख्या</th>
+                                </tr>
+                            </thead>
+                            <tbody id="villageSummaryBody">
+                                <tr>
+                                    <td colspan="2" class="px-3 py-3 text-center text-gray-400">माहिती उपलब्ध नाही.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Relationship-wise Table -->
+            <div class="bg-white rounded-2xl shadow-md p-4 border border-rose-100 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-sm font-bold text-gray-800 mb-3 flex items-center">
+                        <i class="fa-solid fa-heart text-rose-500 mr-2"></i>नातेसंबंध समरी
+                    </h3>
+                    <div class="overflow-x-auto max-h-52 overflow-y-auto rounded-lg border border-gray-100">
+                        <table class="w-full text-xs text-left text-gray-600">
+                            <thead class="text-xs text-gray-700 uppercase bg-rose-50 sticky top-0">
+                                <tr>
+                                    <th class="px-3 py-2">नातेसंबंध</th>
+                                    <th class="px-3 py-2 text-right">संख्या</th>
+                                </tr>
+                            </thead>
+                            <tbody id="relSummaryBody">
+                                <tr>
+                                    <td colspan="2" class="px-3 py-3 text-center text-gray-400">माहिती उपलब्ध नाही.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart Card -->
+            <div class="bg-white rounded-2xl shadow-md p-4 border border-rose-100 flex flex-col items-center justify-center">
+                <h3 class="text-sm font-bold text-gray-800 w-full mb-2">
+                    <i class="fa-solid fa-chart-pie text-rose-500 mr-2"></i>गाववार आलेख (Chart)
+                </h3>
+                <div class="w-full h-48 flex items-center justify-center relative">
+                    <canvas id="villageChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Guest Table Section -->
+        <section class="bg-white rounded-2xl shadow-md p-5 border border-rose-100">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <i class="fa-solid fa-address-book text-rose-600"></i> संपूर्ण पाहुण्यांची यादी
+                </h2>
+                
+                <div class="flex items-center space-x-2 w-full sm:w-auto">
+                    <input type="text" id="searchInput" oninput="renderData()" placeholder="नाव, गाव, नाते शोधा..." 
+                        class="px-3 py-2 text-sm border border-gray-300 rounded-lg w-full sm:w-56 focus:outline-none focus:ring-1 focus:ring-rose-500">
+                    
+                    <button onclick="openResetModal()" title="सर्व डेटा हटवा" class="bg-red-50 hover:bg-red-100 text-red-600 px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1 border border-red-200 shrink-0">
+                        <i class="fa-solid fa-trash-can"></i> रिसेट
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto rounded-xl border border-gray-200">
+                <table class="w-full text-sm text-left text-gray-700">
+                    <thead class="text-xs text-gray-700 uppercase bg-rose-100">
+                        <tr>
+                            <th class="px-4 py-3">अ. क्र.</th>
+                            <th class="px-4 py-3">व्यक्तिचे नाव</th>
+                            <th class="px-4 py-3">गावाचे नाव</th>
+                            <th class="px-4 py-3">नातेसंबंध</th>
+                            <th class="px-4 py-3">संपर्क क्रमांक</th>
+                            <th class="px-4 py-3 text-center">कारवाई</th>
+                        </tr>
+                    </thead>
+                    <tbody id="guestListBody" class="divide-y divide-gray-100">
+                        <!-- Rows rendered dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Bottom Action Floating Button for Mobile Excel Download -->
+    <div class="fixed bottom-4 right-4 sm:hidden z-40">
+        <button onclick="exportToExcel()" class="bg-emerald-600 text-white p-4 rounded-full shadow-2xl flex items-center justify-center active:scale-90 transition">
+            <i class="fa-solid fa-file-excel text-2xl"></i>
+        </button>
+    </div>
+
+    <!-- Application Script Logic -->
+    <script>
+        // Default Sample Data if Empty
+        const defaultGuests = [
+            { id: 1, name: "गणेश पाटील", village: "पुणे", relationship: "मामा", contact: "9876543210" },
+            { id: 2, name: "सुरेश देशमुख", village: "सातारा", relationship: "मित्र", contact: "9123456789" },
+            { id: 3, name: "महेश कदम", village: "पुणे", relationship: "काका", contact: "9988776655" }
+        ];
+
+        // State Array for Guests & Settings
+        let guests = JSON.parse(localStorage.getItem('wedding_guests_data_v3')) || defaultGuests;
+        let scriptUrl = localStorage.getItem('wedding_script_url') || '';
+
+        let villageChartInstance = null;
+
+        // Settings Modal Handlers
+        function openSettingsModal() {
+            document.getElementById('scriptUrlInput').value = scriptUrl;
+            document.getElementById('settingsModal').classList.remove('hidden');
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').classList.add('hidden');
+        }
+
+        function saveSettings() {
+            const url = document.getElementById('scriptUrlInput').value.trim();
+            scriptUrl = url;
+            localStorage.setItem('wedding_script_url', url);
+            closeSettingsModal();
+            showToast("Google Drive लिंक सेव्ह झाली!");
+            syncToGoogleDrive();
+        }
+
+        // Live Dynamic Syncing to Google Sheets
+        async function syncToGoogleDrive() {
+            if (!scriptUrl) return;
+
+            const syncStatus = document.getElementById('syncStatus');
+            const syncText = document.getElementById('syncText');
+            syncStatus.classList.remove('hidden');
+            syncText.innerText = "Google Drive (Sheet) वर अपडेट होत आहे...";
+
+            try {
+                await fetch(scriptUrl, {
+                    method: 'POST',
+                    mode: 'no-cors', // Avoid CORS block for Apps Script
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ guests: guests })
+                });
+
+                syncText.innerText = "Google Drive शीट्सवर सिंक पूर्ण झाले!";
+                setTimeout(() => {
+                    syncStatus.classList.add('hidden');
+                }, 2000);
+            } catch (err) {
+                console.error("Sync Error:", err);
+                syncText.innerText = "Google Drive सिंक करताना त्रुटी आली.";
+                setTimeout(() => {
+                    syncStatus.classList.add('hidden');
+                }, 3000);
+            }
+        }
+
+        // Toast Message Notification Helper
+        function showToast(msg, isError = false) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMsg.innerText = msg;
+            if (isError) {
+                toastIcon.className = "fa-solid fa-circle-xmark text-red-400 text-lg";
+            } else {
+                toastIcon.className = "fa-solid fa-circle-check text-emerald-400 text-lg";
+            }
+
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Initialize App
+        window.onload = function () {
+            renderData();
+        };
+        // Save data to localStorage and Dynamic Google Drive Sync
+        function saveData() {
+            localStorage.setItem('wedding_guests_data_v3', JSON.stringify(guests));
+            renderData();
+            syncToGoogleDrive(); // Dynamically Sync Every Change
+        }
+
+        // Add Guest Handler
+        function addGuest(e) {
+            e.preventDefault();
+            const nameInput = document.getElementById('personName');
+            const villageInput = document.getElementById('villageName');
+            const relInput = document.getElementById('relationship');
+            const phoneInput = document.getElementById('contactNum');
+
+            const name = nameInput.value.trim();
+            const village = villageInput.value.trim();
+            const relationship = relInput.value.trim() || 'पाहुणे';
+            const contact = phoneInput.value.trim() || '-';
+
+            if (name && village) {
+                const newGuest = {
+                    id: Date.now(),
+                    name: capitalizeFirst(name),
+                    village: capitalizeFirst(village),
+                    relationship: capitalizeFirst(relationship),
+                    contact: contact
+                };
+
+                guests.unshift(newGuest); // Add to beginning
+                saveData();
+                showToast("नाव यशस्वीरीत्या जोडले!");
+
+                // Reset inputs
+                nameInput.value = '';
+                villageInput.value = '';
+                relInput.value = '';
+                phoneInput.value = '';
+                nameInput.focus();
+            }
+        }
+
+        function capitalizeFirst(str) {
+            return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+        }
+
+        // Delete Individual Guest
+        function deleteGuest(id) {
+            guests = guests.filter(g => g.id !== id);
+            saveData();
+            showToast("नोंद हटवण्यात आली आहे.", true);
+        }
+
+        // Modal Handlers for Resetting Data
+        function openResetModal() {
+            if (guests.length === 0) {
+                showToast("यादी आधीच रिकामी आहे!", true);
+                return;
+            }
+            document.getElementById('resetModal').classList.remove('hidden');
+        }
+
+        function closeResetModal() {
+            document.getElementById('resetModal').classList.add('hidden');
+        }
+
+        function confirmResetAll() {
+            guests = [];
+            saveData();
+            closeResetModal();
+            showToast("सर्व डेटा रिसेट केला गेला आहे.", true);
+        }
+
+        // Compute Counts for any Key
+        function getStatsByKey(filteredGuestsList, key) {
+            const counts = {};
+            filteredGuestsList.forEach(g => {
+                const val = g[key] || 'इतर';
+                counts[val] = (counts[val] || 0) + 1;
+            });
+            return counts;
+        }
+
+        // Render Tables, Counts & Chart
+        function renderData() {
+            const searchQuery = document.getElementById('searchInput').value.toLowerCase().trim();
+            
+            // Filter Guests
+            const filteredGuests = guests.filter(g => 
+                g.name.toLowerCase().includes(searchQuery) || 
+                g.village.toLowerCase().includes(searchQuery) ||
+                (g.relationship && g.relationship.toLowerCase().includes(searchQuery)) ||
+                (g.contact && g.contact.includes(searchQuery))
+            );
+
+            // 1. Render Main Guest Table
+            const guestBody = document.getElementById('guestListBody');
+            guestBody.innerHTML = '';
+
+            if (filteredGuests.length === 0) {
+                guestBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-4 py-8 text-center text-gray-400">
+                            कोणतीही नोंद सापडली नाही.
+                        </td>
+                    </tr>
+                `;
+            } else {
+                filteredGuests.forEach((guest, index) => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-rose-50/40 transition";
+                    tr.innerHTML = `
+                        <td class="px-4 py-3 font-medium text-gray-500">${index + 1}</td>
+                        <td class="px-4 py-3 font-semibold text-gray-800">${guest.name}</td>
+                        <td class="px-4 py-3 text-gray-600">
+                            <span class="inline-block bg-amber-100 text-amber-800 text-xs px-2.5 py-0.5 rounded-full font-medium">
+                                ${guest.village}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-gray-600">
+                            <span class="inline-block bg-indigo-50 text-indigo-700 text-xs px-2 py-0.5 rounded-md border border-indigo-100">
+                                ${guest.relationship || 'पाहुणे'}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-gray-600 font-mono text-xs">${guest.contact || '-'}</td>
+                        <td class="px-4 py-3 text-center">
+                            <button onclick="deleteGuest(${guest.id})" class="text-rose-500 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-100 transition" title="हटवा">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </td>
+                    `;
+                    guestBody.appendChild(tr);
+                });
+            }
+
+            // 2. Update Counts
+            document.getElementById('totalGuestsCount').innerText = guests.length;
+            const villageStats = getStatsByKey(guests, 'village');
+            const relStats = getStatsByKey(guests, 'relationship');
+            
+            document.getElementById('totalVillagesCount').innerText = Object.keys(villageStats).length;
+            document.getElementById('totalRelationsCount').innerText = Object.keys(relStats).length;
+
+            // 3. Render Village Summary Table
+            renderSummaryTable('villageSummaryBody', villageStats);
+
+            // 4. Render Relationship Summary Table
+            renderSummaryTable('relSummaryBody', relStats);
+
+            // 5. Update Chart.js Graphic
+            updateChart(villageStats);
+        }
+
+        // Helper to render summary tables
+        function renderSummaryTable(elementId, statsData) {
+            const tbody = document.getElementById(elementId);
+            tbody.innerHTML = '';
+
+            const entries = Object.entries(statsData).sort((a, b) => b[1] - a[1]);
+            if (entries.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="2" class="px-3 py-3 text-center text-gray-400">माहिती नाही.</td></tr>`;
+                return;
+            }
+
+            entries.forEach(([key, count]) => {
+                const row = document.createElement('tr');
+                row.className = "border-b border-gray-100 hover:bg-gray-50";
+                row.innerHTML = `
+                    <td class="px-3 py-1.5 font-medium text-gray-700">${key}</td>
+                    <td class="px-3 py-1.5 font-bold text-rose-600 text-right">${count}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Chart Update Function
+        function updateChart(villageStats) {
+            const ctx = document.getElementById('villageChart').getContext('2d');
+            const labels = Object.keys(villageStats);
+            const data = Object.values(villageStats);
+
+            if (villageChartInstance) {
+                villageChartInstance.destroy();
+            }
+
+            if (labels.length === 0) return;
+
+            const bgColors = [
+                '#f43f5e', '#f59e0b', '#10b981', '#3b82f6', 
+                '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'
+            ];
+
+            villageChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'पाहुण्यांची संख्या',
+                        data: data,
+                        backgroundColor: bgColors.slice(0, labels.length),
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: {
+                                    family: "'Noto Sans Devanagari', sans-serif",
+                                    size: 10
+                                },
+                                boxWidth: 10
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- Web Speech API (Marathi Voice Recognition) ---
+        function startSpeech(inputId, micBtnId) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+            if (!SpeechRecognition) {
+                showToast("ब्राऊझरमध्ये व्हॉईस सपोर्ट नाही. Chrome वापरा.", true);
+                return;
+            }
+
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'mr-IN';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            const micBtn = document.getElementById(micBtnId);
+            micBtn.classList.add('mic-active');
+
+            recognition.start();
+
+            recognition.onresult = function (event) {
+                let speechResult = event.results[0][0].transcript.trim();
+                speechResult = speechResult.replace(/\.$/, '');
+                
+                // Convert Marathi digits to English digits if contact number input
+                if (inputId === 'contactNum') {
+                    speechResult = convertMarathiDigitsToEnglish(speechResult).replace(/\D/g, '');
+                }
+
+                document.getElementById(inputId).value = speechResult;
+                micBtn.classList.remove('mic-active');
+            };
+
+            recognition.onspeechend = function () {
+                recognition.stop();
+                micBtn.classList.remove('mic-active');
+            };
+
+            recognition.onerror = function () {
+                micBtn.classList.remove('mic-active');
+                showToast("आवाज ओळखता आला नाही. पुन्हा बोला.", true);
+            };
+        }
+
+        // Convert Marathi Digits to English Numbers
+        function convertMarathiDigitsToEnglish(str) {
+            const marathiNumbers = ['०', '१', '२', '३', '४', '५', '६', '७', '८', '९'];
+            return str.replace(/[०-९]/g, function (w) {
+                return marathiNumbers.indexOf(w);
+            });
+        }
+
+        // Smart Combined Voice Recognition (Name Village Relationship Contact)
+        function startCombinedSpeech() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+            if (!SpeechRecognition) {
+                showToast("ब्राऊझरमध्ये व्हॉईस सपोर्ट नाही. Chrome वापरा.", true);
+                return;
+            }
+
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'mr-IN';
+            recognition.interimResults = false;
+
+            const combinedBtn = document.getElementById('combinedMicBtn');
+            combinedBtn.classList.add('mic-active');
+
+            recognition.start();
+
+            recognition.onresult = function (event) {
+                const transcript = event.results[0][0].transcript.trim();
+                combinedBtn.classList.remove('mic-active');
+
+                const words = transcript.split(' ');
+                
+                // Extract contact number if exists
+                let contact = '';
+                const cleanText = convertMarathiDigitsToEnglish(transcript);
+                const phoneMatch = cleanText.match(/\d{8,12}/);
+                
+                if (phoneMatch) {
+                    contact = phoneMatch[0];
+                }
+
+                // Filter out numbers for text processing
+                const textWords = words.filter(w => !/\d/.test(convertMarathiDigitsToEnglish(w)));
+
+                if (textWords.length >= 3) {
+                    document.getElementById('personName').value = textWords.slice(0, textWords.length - 2).join(' ');
+                    document.getElementById('villageName').value = textWords[textWords.length - 2];
+                    document.getElementById('relationship').value = textWords[textWords.length - 1];
+                } else if (textWords.length === 2) {
+                    document.getElementById('personName').value = textWords[0];
+                    document.getElementById('villageName').value = textWords[1];
+                } else if (textWords.length === 1) {
+                    document.getElementById('personName').value = textWords[0];
+                }
+
+                if (contact) {
+                    document.getElementById('contactNum').value = contact;
+                }
+            };
+
+            recognition.onspeechend = function () {
+                recognition.stop();
+                combinedBtn.classList.remove('mic-active');
+            };
+
+            recognition.onerror = function () {
+                combinedBtn.classList.remove('mic-active');
+                showToast("आवाज ऐकू आला नाही. पुन्हा बोला.", true);
+            };
+        }
+
+        // --- EXPORT TO EXCEL SHEET (SheetJS) ---
+        function exportToExcel() {
+            if (typeof XLSX === 'undefined') {
+                showToast("एक्सेल लायब्ररी लोड होत आहे. 2 सेकंदांनी प्रयत्न करा.", true);
+                return;
+            }
+
+            if (guests.length === 0) {
+                showToast("एक्सेल डाऊनलोडसाठी कमीत कमी एक नाव असणे आवश्यक आहे.", true);
+                return;
+            }
+
+            try {
+                // Sheet 1: Full Guest List with All Columns
+                const sheet1Data = guests.map((g, index) => ({
+                    "अ. क्र.": index + 1,
+                    "व्यक्तिचे नाव": g.name,
+                    "गावाचे नाव": g.village,
+                    "नातेसंबंध": g.relationship || 'पाहुणे',
+                    "संपर्क क्रमांक": g.contact || '-'
+                }));
+
+                const ws1 = XLSX.utils.json_to_sheet(sheet1Data);
+                ws1['!cols'] = [
+                    { wch: 8 },  // Sr No
+                    { wch: 28 }, // Name
+                    { wch: 20 }, // Village
+                    { wch: 18 }, // Relationship
+                    { wch: 16 }  // Contact
+                ];
+
+                // Sheet 2: Summary / Village-wise & Relationship-wise Count & Total Count
+                const villageStats = getStatsByKey(guests, 'village');
+                const relStats = getStatsByKey(guests, 'relationship');
+
+                const sheet2Data = [];
+
+                // Village Section Header
+                sheet2Data.push({ "तपशील / प्रकार": "--- गाववार आकडेवारी ---", "नाव": "", "संख्या": "" });
+                let srNo = 1;
+                for (const [vName, vCount] of Object.entries(villageStats)) {
+                    sheet2Data.push({
+                        "तपशील / प्रकार": `गाव #${srNo++}`,
+                        "नाव": vName,
+                        "संख्या": vCount
+                    });
+                }
+
+                sheet2Data.push({}); // Empty row
+
+                // Relationship Section Header
+                sheet2Data.push({ "तपशील / प्रकार": "--- नातेसंबंध आकडेवारी ---", "नाव": "", "संख्या": "" });
+                let rNo = 1;
+                for (const [rName, rCount] of Object.entries(relStats)) {
+                    sheet2Data.push({
+                        "तपशील / प्रकार": `नाते #${rNo++}`,
+                        "नाव": rName,
+                        "संख्या": rCount
+                    });
+                }
+
+                // Total Summary Row
+                sheet2Data.push({});
+                sheet2Data.push({
+                    "तपशील / प्रकार": "एकूण पाहुणे",
+                    "नाव": "एकूण टोटल आकडेवारी",
+                    "संख्या": guests.length
+                });
+
+                const ws2 = XLSX.utils.json_to_sheet(sheet2Data);
+                ws2['!cols'] = [
+                    { wch: 25 },
+                    { wch: 25 },
+                    { wch: 15 }
+                ];
+
+                // Create Workbook and Append Sheets
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws1, "संपूर्ण पाहुण्यांची यादी");
+                XLSX.utils.book_append_sheet(wb, ws2, "गाव व नाते आकडेवारी समरी");
+
+                // Download Excel File
+                const fileName = `लग्न_पाहुणे_यादी_${new Date().toISOString().slice(0,10)}.xlsx`;
+                XLSX.writeFile(wb, fileName);
+                showToast("एक्सेल शीट यशस्वीरीत्या डाऊनलोड झाली!");
+
+            } catch (err) {
+                console.error("Excel export error:", err);
+                showToast("एक्सेल डाऊनलोड करताना त्रुटी आली.", true);
+            }
+        }
+    </script>
+</body>
+</html>
